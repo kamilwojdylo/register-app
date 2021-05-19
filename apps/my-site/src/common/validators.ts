@@ -1,5 +1,7 @@
 import * as Yup from 'yup';
-export const validateUsername = async (username: string) => {
+import { MISSING_DOC } from 'pouchdb-errors';
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export const validateUsername = async (username: string, db: any) => {
   try {
     await Yup.string()
       .min(5, 'Username should be at least 5 characters long')
@@ -7,17 +9,19 @@ export const validateUsername = async (username: string) => {
         /^[a-zA-Z0-9]+$/,
         'Only letters and numbers are allowed for username'
       )
-      .test(
-          'is-unique-username',
-        '"${value}" user is already registered',
-          async (value, context) => {
-              return false;
-          }
-      )
       .validate(username);
   } catch (err) {
     return err.message;
   }
+  try {
+    await db.get(username);
+  } catch(err) {
+        if (err.name !== MISSING_DOC.name) {
+          console.error(err);
+        }
+        return;
+  }
+  return `"${username}" user is already registered`;
 };
 
 export const validatePassword = async (password: string) => {
@@ -39,12 +43,12 @@ export const validatePassword = async (password: string) => {
   }
 };
 
-export const validatePasswordRepeat = (
+export const validatePasswordRepeat = async (
   password: string,
   passwordRepeat: string
 ) => {
   if (password !== passwordRepeat) {
-    return 'Both passwords should be the same';
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return Promise.resolve('Both passwords should be the same') as Promise<any>;
   }
-  return '';
 };

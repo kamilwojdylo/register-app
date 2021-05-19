@@ -1,7 +1,21 @@
 import { getUsername, getUsernameError, getRegisterButton, getPassword, getPasswordError, getFeedbackMessage, getPasswordRepeat, getPasswordRepeatError } from '../support/app.po';
+import PouchDB from 'pouchdb/dist/pouchdb';
 
 describe('my-site', () => {
-  beforeEach(() => cy.visit('/'));
+  let db, registeredAccount;
+  beforeEach( () => 
+    cy.visit('/')
+    .then(() => cy.fixture('account'))
+    .then(a => {
+      registeredAccount = a;
+    })
+    .then(() => {
+      db = new PouchDB('users');
+      return db.put(registeredAccount);
+    })
+  );
+
+  afterEach(() => db.destroy());
   describe('verifies and informs that', () => {
     it('The username field accepts alpha-numeric values only', () => {
       getUsername().type('wrong-username!');
@@ -18,10 +32,9 @@ describe('my-site', () => {
     });
 
     it('The username is already registered', () => {
-      const alreadyRegisteredUser = 'alreadyRegisteredUser'
-      getUsername().type(alreadyRegisteredUser);
+      getUsername().type(registeredAccount._id);
       getRegisterButton().click();
-      getUsernameError().contains(`"${alreadyRegisteredUser}" user is already registered`);
+      getUsernameError().contains(`"${registeredAccount._id}" user is already registered`);
       getFeedbackMessage().should('not.be.visible');
     });
 
@@ -65,7 +78,7 @@ describe('my-site', () => {
       getPassword().type('ProperPassword1');
       getPasswordRepeat().type('ProperPassword1');
       getRegisterButton().click();
-      getUsernameError().should('be.empty');
+      getUsernameError().should('not.exist');
       getPasswordError().should('not.exist');
       getPasswordRepeatError().should('not.exist');
       getFeedbackMessage().contains('Your account has been registered');

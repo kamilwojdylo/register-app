@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Formik, FormikHelpers } from 'formik';
 import {
   Button,
@@ -19,27 +20,52 @@ interface FormValues {
   passwordRepeat: string;
 }
 
-const RegisterForm = () => {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+type FeedbackStatus = 'none' | 'success' | 'error';
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const RegisterForm = ({ usersDb }: { usersDb: any }) => {
+  const [feedbackStatus, setFeedbackStatus] = useState<FeedbackStatus>('none');
   const onSubmit = (
     values: FormValues,
     actions: FormikHelpers<FormValues>
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
   ): void | Promise<any> => {
-    console.log(values, actions);
-    setTimeout(() => {
-      alert(JSON.stringify(values, null, 2));
-      actions.setSubmitting(false);
-    });
+    const { username, password } = values;
+    usersDb
+      .put({ _id: username, password })
+      .then(() => {
+        actions.setSubmitting(false);
+        actions.resetForm();
+        setFeedbackStatus('success');
+      })
+      .catch((err: Error) => {
+        console.error(err);
+        setFeedbackStatus('error');
+      })
+      .finally(() => {
+        setTimeout(() => setFeedbackStatus('none'), 5000);
+      });
   };
 
   const onValidate = async (values: FormValues) => {
-    const errors = { username: '', password: '', passwordRepeat: '' };
-    errors.username = await validateUsername(values.username);
-    errors.password = await validatePassword(values.password);
-    errors.passwordRepeat = validatePasswordRepeat(
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const errors: any = {};
+    const userErrors = await validateUsername(values.username, usersDb);
+    const passwordErrors = await validatePassword(values.password);
+    const passwordRepeatErrors = await validatePasswordRepeat(
       values.password,
       values.passwordRepeat
     );
+    if (userErrors) {
+      errors.username = userErrors;
+    }
+    if (passwordErrors) {
+      errors.password = passwordErrors;
+    }
+
+    if (passwordRepeatErrors) {
+      errors.passwordRepeat = passwordRepeatErrors;
+    }
 
     return errors;
   };
@@ -63,8 +89,6 @@ const RegisterForm = () => {
             handleBlur,
             handleSubmit,
             isSubmitting,
-            isValid,
-            /* and other goodies */
           }) => (
             <Form size="large" onSubmit={handleSubmit}>
               <Segment stacked>
@@ -121,7 +145,7 @@ const RegisterForm = () => {
                   onBlur={handleBlur}
                   value={values.passwordRepeat}
                   error={
-                    errors.passwordRepeat !== '' &&
+                    errors.passwordRepeat &&
                     touched.passwordRepeat && {
                       id: 'passwordRepeat-error',
                       content: errors.passwordRepeat,
@@ -136,14 +160,16 @@ const RegisterForm = () => {
                   size="large"
                   type="submit"
                   disabled={isSubmitting}
+                  loading={isSubmitting}
                 >
                   Register
                 </Button>
-                {values.username}
                 <Message
                   id="feedback-msg"
-                  success
-                  visible={values.username === 'ProperUsername1'}
+                  positive={feedbackStatus === 'success'}
+                  negative={feedbackStatus === 'error'}
+                  hidden={feedbackStatus === 'none'}
+                  visible={feedbackStatus !== 'none'}
                   header="Registration Completed"
                   content="Your account has been registered"
                 />
